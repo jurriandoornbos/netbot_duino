@@ -9,8 +9,6 @@
 #include <QTRSensors.h>
 
 
-
-
 #define SERVOMIN  88  // This is the 'minimum' pulse length count (out of 4096) (org=150)
 #define SERVOMAX  320 // This is the 'maximum' pulse length count (out of 4096) (org=600)
 #define USMIN  600    // This is the rounded 'minimum' microsecond length based on the minimum pulse of 150 (org=600)
@@ -21,22 +19,22 @@
 #define WHEEL_FRONT 230  
 #define WHEEL_BACK -230 
 int left_wheel_front_dir {1}; // Dir of the wheel when going to front. Change to -1 if opposite dir
-int right_wheel_front_dir {1}; // Dir of the wheel when going to front. Change to -1 if opposite dir
-int left_wheel_stable_point {DEFAULT_WHEEL_STABLE};
-int right_wheel_stable_point {DEFAULT_WHEEL_STABLE};
+int right_wheel_front_dir {-1}; // Dir of the wheel when going to front. Change to -1 if opposite dir
+int left_wheel_stable_point {DEFAULT_WHEEL_STABLE}; //350  robot 15 bieng a very special boy
+int right_wheel_stable_point {DEFAULT_WHEEL_STABLE}; //270 robot 15  (340 is stable, but too quick for the left motor to keep up)
 volatile int left_wheel_count = 0; // Count for the odometry
 volatile int right_wheel_count = 0; // Count for the odometry
 volatile int left_wheel_dir = 0; // Direction for the odometry
 volatile int right_wheel_dir = 0; // Direction for the odometry
 
 
-
+#define BLACK_LINE_THRESHOLD 800 // Value of black line treshold
 #define NUM_FOLLOW_LINE             4  // number of sensors used
 #define NUM_SAMPLES_PER_FOLLOW_LINE  4  // average 4 analog samples per sensor reading
 #define EMITTER_PIN             4  // emitter is controlled by digital pin 4
 
-#define PROX_SENSOR_LEFT 2    // Pin for the odometry sensor in the left wheel 
-#define PROX_SENSOR_RIGHT 3    // Pin for the odometry sensor in the right wheel 
+#define PROX_SENSOR_LEFT 3   // Pin for the odometry sensor in the left wheel 
+#define PROX_SENSOR_RIGHT 2    // Pin for the odometry sensor in the right wheel 
 
 #define echoPin 6     // attach pin D6 Arduino to pin Echo of HC-SR04
 #define trigPin 5     //attach pin D5 Arduino to pin Trig of HC-SR04
@@ -49,8 +47,8 @@ const int buzzer = 7; //buzzer to arduino pin 9
 bool call_calibrate_rgb_bit_camera = false;
 bool call_calibrate_motors = false;
 
-bool proximity_sensor_left_connected {false};
-bool proximity_sensor_right_connected {false};
+bool proximity_sensor_left_connected {true};
+bool proximity_sensor_right_connected {true};
 
 
 Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
@@ -153,8 +151,11 @@ void stop_robot(void) {
 }
 
 void go_to_front(void) {
-  pwm.setPWM(L_servo, 0, left_wheel_stable_point + left_wheel_front_dir*WHEEL_FRONT);
-  pwm.setPWM(R_servo, 0, right_wheel_stable_point + right_wheel_front_dir*WHEEL_FRONT);
+  int8_t l_fw = left_wheel_stable_point + left_wheel_front_dir*WHEEL_FRONT;
+  int8_t r_fw = right_wheel_stable_point + right_wheel_front_dir*WHEEL_FRONT;
+
+  pwm.setPWM(L_servo, 0, l_fw);
+  pwm.setPWM(R_servo, 0, r_fw);
   left_wheel_dir = 1;
   right_wheel_dir = 1;
 }
@@ -185,7 +186,28 @@ uint16_t read_line_black_position(void) {
   return qtra.readLineBlack(sensorValues);
 }
 
-void follow_line(void) {
+//some function to give array of true false values and black line position
+bool* black_line_array(void) {
+  static bool line_array[NUM_FOLLOW_LINE];
+  
+  for (int i = 0; i < NUM_FOLLOW_LINE; i++) {
+    line_array[i] = sensorValues[i] > BLACK_LINE_THRESHOLD;
+  }
+  return line_array;
+}
+
+
+void follow_line(int error) {
+  int Kp = 3;
+
+  int adjust = Kp*error;
+
+  float L_speed =  left_wheel_front_dir * (WHEEL_FRONT - adjust);
+  float R_speed =  right_wheel_front_dir * (WHEEL_FRONT - adjust);
+  
+  pwm.setPWM(L_servo, 0, left_wheel_stable_point + L_speed);
+  pwm.setPWM(R_servo, 0, right_wheel_stable_point + R_speed);
+  delay(50);
 
 }
 
@@ -193,6 +215,20 @@ void follow_line(void) {
 int read_prox_sensor_left(void) {
   return digitalRead(PROX_SENSOR_LEFT);
 }
+
+int read_prox_sensor_right(void) {
+  return digitalRead(PROX_SENSOR_RIGHT);
+}
+
+void overwrite_ir_calibration(void){
+  // robot calibration is quite irreliable, so we overwrite it with some default values
+  // only works after calibration is executed
+  for (int i = 0; i < NUM_FOLLOW_LINE; i++) {
+    qtra.calibrationOn.minimum[i] = 600;
+    qtra.calibrationOn.maximum[i] = 900;
+  }
+}
+
 
 void calibrate_motors(void) {
   delay(500);
@@ -283,16 +319,20 @@ void calibrate_rgb_bit_camera(void) {
   
   
     // print the calibration minimum values measured when emitters were on
+    Serial.print("Min:");
     for (int i = 0; i < NUM_FOLLOW_LINE; i++)
     {
+      
       Serial.print(qtra.calibrationOn.minimum[i]);
       Serial.print(' ');
     }
     Serial.println();
   
     // print the calibration maximum values measured when emitters were on
+    Serial.print("Max:");
     for (int i = 0; i < NUM_FOLLOW_LINE; i++)
     {
+      
       Serial.print(qtra.calibrationOn.maximum[i]);
       Serial.print(' ');
     }
@@ -352,5 +392,8 @@ void default_config_setup() {
     calibrate_rgb_bit_camera();
   }  
 }
+
+
+
 
 #endif  // AWESOME_LIB_H
