@@ -7,6 +7,7 @@
 #include <Adafruit_TCS34725.h>
 #include <Adafruit_PWMServoDriver.h>
 #include <QTRSensors.h>
+#include <Adafruit_NeoPixel.h>
 
 
 #define SERVOMIN  88  // This is the 'minimum' pulse length count (out of 4096) (org=150)
@@ -212,7 +213,7 @@ int array_count(bool* arr){
     sum = sum+arr[i];
 
   }
-  return sum
+  return sum;
 }
 
 
