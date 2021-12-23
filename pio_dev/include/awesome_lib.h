@@ -89,6 +89,13 @@ void buzzer_sound(float time) {
   wait(time);        // ...for 1sec
 }
 
+void buzzer_number(int no_beeps){
+  for (int i = 0; i < no_beeps; i++) {
+    buzzer_sound(0.1);
+  }
+
+}
+
 
 float* read_rgb_sensor() {
   float red, green, blue;
@@ -194,6 +201,18 @@ bool* black_line_array(void) {
     line_array[i] = sensorValues[i] > BLACK_LINE_THRESHOLD;
   }
   return line_array;
+}
+
+int array_count(bool* arr){
+  int n = sizeof(arr)/sizeof(arr[0]);
+  int sum=0;
+
+  for (int i =0; i<n; i++){
+
+    sum = sum+arr[i];
+
+  }
+  return sum
 }
 
 
